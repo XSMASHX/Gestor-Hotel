@@ -7,6 +7,7 @@ from werkzeug.utils import secure_filename
 from config import config
 from modelos.ModelUser import ModelUser
 from modelos.entities.User import User
+from datetime import datetime
 
 def get_habitacion(id):
     cursor = db.connection.cursor()
@@ -44,14 +45,16 @@ def update_habitacion(id, data):
     db.connection.commit()
     cursor.close()
 
-# Importar la configuración
-from config import config
+    registrar_evento_historial(id, data['id_orden'], None, 'editar')
 
-# Modelos
-from modelos.ModelUser import ModelUser
-
-# Entities:
-from modelos.entities.User import User
+def registrar_evento_historial(id_habitacion, id_orden, imagen, accion='agregar', nombre=None):
+    cursor = db.connection.cursor()
+    cursor.execute("""
+        INSERT INTO habitaciones_historial (id_habitacion, id_orden, imagen, accion, nombre, fecha_eliminacion)
+        VALUES (%s, %s, %s, %s, %s, %s)
+    """, (id_habitacion, id_orden, imagen, accion, nombre, datetime.now()))
+    db.connection.commit()
+    cursor.close()
 
 app = Flask(__name__)
 app.secret_key = 'your_secret_key'
@@ -64,7 +67,7 @@ app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # Limitar el tamaño de arc
 app.config['MYSQL_HOST'] = 'localhost'
 app.config['MYSQL_USER'] = 'root'
 app.config['MYSQL_PASSWORD'] = ''
-app.config['MYSQL_DB'] = 'nombre_de_tu_base_de_datos'
+app.config['MYSQL_DB'] = 'hotel_gestor'
 db = MySQL(app)
 
 login_manager_app = LoginManager(app)
@@ -131,23 +134,47 @@ def configuracion():
                     (nombre, tipo, 'libre', filename)
                 )
                 db.connection.commit()
+                id_habitacion = cursor.lastrowid
                 cursor.close()
+
+                registrar_evento_historial(id_habitacion, None, filename, 'agregar', nombre)
+
         elif 'eliminar' in request.form:
             habitacion_id = int(request.form['id'])
-            cursor = db.connection.cursor()
-            cursor.execute("DELETE FROM habitaciones WHERE id = %s", (habitacion_id,))
-            db.connection.commit()
-            cursor.close()
+            eliminar_habitacion(habitacion_id)
+
     cursor = db.connection.cursor()
     cursor.execute("SELECT * FROM habitaciones")
     habitaciones = cursor.fetchall()
     cursor.close()
-    return render_template('configuracion.html', habitaciones=habitaciones, active_page='configuracion')
+    return render_template('configuracion.html', habitaciones=habitaciones)
+
+def eliminar_habitacion(id_habitacion):
+    cursor = db.connection.cursor()
+
+    # Obtener información de la habitación antes de eliminarla
+    cursor.execute("SELECT id, nombre, id_orden, imagen FROM habitaciones WHERE id = %s", (id_habitacion,))
+    habitacion = cursor.fetchone()
+    
+    if habitacion:
+        id_habitacion, nombre, id_orden, imagen = habitacion
+
+        # Registrar la eliminación en el historial
+        registrar_evento_historial(id_habitacion, id_orden, imagen, 'eliminar', nombre)
+
+        # Actualizar las órdenes asociadas a la habitación a eliminar
+        cursor.execute("UPDATE ordenes SET habitacion_id = NULL WHERE habitacion_id = %s", (id_habitacion,))
+        db.connection.commit()
+
+        # Eliminar la habitación
+        cursor.execute("DELETE FROM habitaciones WHERE id = %s", (id_habitacion,))
+        db.connection.commit()
+    
+    cursor.close()
 
 def allowed_file(filename):
     return '.' in filename and \
            filename.rsplit('.', 1)[1].lower() in {'png', 'jpg', 'jpeg', 'gif'}
-
 
 @app.route('/editar_habitacion/<int:id>', methods=['GET', 'POST'])
 def editar_habitacion(id):
@@ -159,6 +186,20 @@ def editar_habitacion(id):
     if not habitacion:
         return redirect(url_for('configuracion'))
 
+    habitacion_dict = {
+        'id': habitacion[0],
+        'nombre': habitacion[1],
+        'tipo': habitacion[2],
+        'estado': habitacion[3],
+        'imagen': habitacion[4],
+        'tiempo_reservacion': habitacion[5] if habitacion[5] else "",
+        'precio': habitacion[6],
+        'metodo_pago': habitacion[7],
+        'numero_personas': habitacion[8],
+        'id_orden': habitacion[9],
+        'estado_pago': habitacion[10]
+    }
+
     if request.method == 'POST':
         estado = request.form['estado']
         precio = request.form['precio']
@@ -166,38 +207,22 @@ def editar_habitacion(id):
         numero_personas = request.form['numero_personas']
         estado_pago = request.form['estado_pago']
         tiempo_reservacion = request.form['tiempo_reservacion']
-
         cursor = db.connection.cursor()
         cursor.execute("""
             UPDATE habitaciones SET estado=%s, tiempo_reservacion=%s, 
             precio=%s, metodo_pago=%s, numero_personas=%s, estado_pago=%s 
             WHERE id=%s
         """, (
-            estado, tiempo_reservacion, precio, metodo_pago,
+            estado, tiempo_reservacion, precio, metodo_pago, 
             numero_personas, estado_pago, id
         ))
         db.connection.commit()
         cursor.close()
-        
-        return redirect(url_for('habitacion_detalle', id=id))
 
-    habitacion_dict = {
-        'id': habitacion[0],
-        'nombre': habitacion[1],
-        'tipo': habitacion[2],
-        'estado': habitacion[3],
-        'tiempo_reservacion': habitacion[4],
-        'precio': habitacion[5],
-        'metodo_pago': habitacion[6],
-        'numero_personas': habitacion[7],
-        'id_orden': habitacion[8],
-        'estado_pago': habitacion[9]
-    }
+        registrar_evento_historial(id, habitacion_dict['id_orden'], habitacion_dict['imagen'], 'editar', habitacion_dict['nombre'])
 
+        return redirect(url_for('configuracion'))
     return render_template('editar_habitacion.html', habitacion=habitacion_dict)
-
-
-
 
 @app.route('/habitaciones')
 @login_required
@@ -240,20 +265,16 @@ def habitaciones():
 
     return render_template('habitaciones.html', habitaciones=habitaciones_dicts, active_page='habitaciones')
 
-
-@app.route('/historial')
-@login_required
+@app.route('/historial', methods=['GET'])
 def historial():
     cursor = db.connection.cursor()
     cursor.execute("""
-        SELECT h.id, h.nombre, h.tipo, h.estado, h.imagen, h.tiempo_reservacion, 
-               o.id AS orden_id, o.estado AS orden_estado, o.usuario_id
-        FROM habitaciones h
-        LEFT JOIN ordenes o ON h.id = o.habitacion_id
+        SELECT hh.id_historial, hh.id_habitacion, hh.id_orden, hh.imagen, hh.fecha_eliminacion, hh.nombre, hh.accion 
+        FROM habitaciones_historial hh
     """)
-    habitaciones_con_ordenes = cursor.fetchall()
-
-    return render_template('historial.html', habitaciones_con_ordenes=habitaciones_con_ordenes, active_page='historial')
+    historial = cursor.fetchall()
+    cursor.close()
+    return render_template('historial.html', historial=historial)
 
 @app.route('/habitacion/<int:id>', methods=['GET', 'POST'])
 @login_required
@@ -276,6 +297,7 @@ def habitacion_detalle(id):
             WHERE id=%s
         """, (nombre, tipo, estado, tiempo_reservacion, precio, metodo_pago, numero_personas, id_orden, estado_pago, id))
         db.connection.commit()
+        registrar_evento_historial(id, id_orden, None, 'editar')
 
     cursor.execute("SELECT * FROM habitaciones WHERE id = %s", (id,))
     habitacion = cursor.fetchone()
@@ -299,8 +321,6 @@ def habitacion_detalle(id):
 
     return render_template('habitacion_detalle.html', habitacion=habitacion_dict)
 
-
-
 @app.route('/get_user_photo')
 def get_user_photo():
     user_id = request.args.get('user_id')
@@ -313,7 +333,6 @@ def get_user_photo():
         return send_file(BytesIO(user[0]), mimetype='image/jpeg')
     else:
         return "Usuario no encontrado o sin foto asociada", 404
-    
 
 @app.route('/upload_photo', methods=['POST'])
 def upload_photo():
@@ -338,13 +357,12 @@ def upload_photo():
         cursor.execute("UPDATE user SET photo=%s WHERE id=%s", (photo_data, user_id))
         db.connection.commit()
         cursor.close()
-     
+    
         return redirect(url_for('some_view'))
     else:
         flash('Invalid file format')
         return redirect(request.url)
 
-    
 if __name__ == '__main__':
     app.config.from_object(config['development'])
     app.run(debug=True)
