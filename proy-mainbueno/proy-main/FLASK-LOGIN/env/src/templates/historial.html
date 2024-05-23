@@ -3,30 +3,34 @@
 {% block title %}Historial{% endblock %}
 
 {% block content %}
-
-<h2>Historial de Registros</h2>
-<ul class="historial-list">
-    {% if habitaciones_con_ordenes %}
-        {% for entrada in habitaciones_con_ordenes %}
-        <li class="historial-item">
-            <p><strong>ID de Habitación:</strong> {{ entrada[0] }}</p>
-            <p><strong>Nombre de la Habitación:</strong> {{ entrada[1] }}</p>
-            <p><strong>Tipo de Habitación:</strong> {{ entrada[2] }}</p>
-            <p><strong>Estado de la Habitación:</strong> {{ entrada[3] }}</p>
-           
-            <p><strong>Tiempo de Reservación:</strong> {{ entrada[5] }}</p>
-            {% if entrada[6] %}
-                <p><strong>ID de Orden:</strong> {{ entrada[6] }}</p>
-                <p><strong>Estado de la Orden:</strong> {{ entrada[7] }}</p>
-                <p><strong>Usuario ID:</strong> {{ entrada[8] }}</p>
-                <p><strong>Estado de Pago:</strong> {{ entrada[9] }}</p>
-            {% else %}
-                <p class="no-ordenes">No hay registros para esta habitación.</p>
-            {% endif %}
-        </li>
+<table>
+    <thead>
+        <tr>
+            <th>ID Historial</th>
+            <th>ID Habitación</th>
+            <th>Imagen</th>
+            <th>Contexto</th>
+            <th>Nombre</th>
+            <th>Acción</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for row in historial %}
+        <tr>
+            <td data-label="ID Historial">{{ row[0] }}</td>
+            <td data-label="ID Habitación">{{ row[1] }}</td>
+            <td data-label="Imagen">
+                {% if row[3] %}
+                <img src="{{ url_for('static', filename='uploads/' ~ row[3]) }}" alt="Imagen de Habitación" style="max-width: 100px; height: auto;">
+                {% else %}
+                No Image
+                {% endif %}
+            </td>
+            <td data-label="Contexto">{{ row[4] }}</td>
+            <td data-label="Nombre">{{ row[5] }}</td>
+            <td data-label="Acción">{{ row[6] }}</td>
+        </tr>
         {% endfor %}
-    {% else %}
-        <p>No hay habitaciones disponibles.</p>
-    {% endif %}
-</ul>
+    </tbody>
+</table>
 {% endblock %}

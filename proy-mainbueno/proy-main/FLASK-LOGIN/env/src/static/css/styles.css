@@ -392,9 +392,97 @@ form button:hover {
     color: #dc3545; /* Red color for no orders message */
     font-weight: bold;
 }
+/* Estilos para la tabla de historial */
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 20px;
+    background-color: #fff;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    border-radius: 8px;
+    overflow: hidden; /* Para asegurar que el borde redondeado se aplique también a los bordes de la tabla */
+}
+
+table thead {
+    background-color: #007bff;
+    color: #fff;
+    text-align: left;
+}
+
+table thead th {
+    padding: 15px;
+    font-size: 1em;
+}
+
+table tbody tr {
+    border-bottom: 1px solid #dee2e6;
+    transition: background-color 0.3s;
+}
+
+table tbody tr:hover {
+    background-color: #f1f3f5;
+}
+
+table tbody td {
+    padding: 15px;
+    color: #495057;
+    font-size: 0.9em;
+}
+
+table tbody td img {
+    width: 100px;
+    height: auto;
+    border-radius: 4px;
+}
+
+table tbody td:last-child {
+    text-align: center; /* Para centrar la última columna */
+}
 
 /* Media queries para diseño responsive */
 @media (max-width: 768px) {
+    table, table thead, table tbody, table th, table td, table tr {
+        display: block;
+    }
+
+    table thead tr {
+        position: absolute;
+        top: -9999px;
+        left: -9999px;
+    }
+
+    table tbody tr {
+        border: 1px solid #dee2e6;
+        margin-bottom: 10px;
+        padding: 10px;
+        border-radius: 8px;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    }
+
+    table tbody td {
+        border: none;
+        position: relative;
+        padding-left: 50%;
+        text-align: left;
+    }
+
+    table tbody td:before {
+        position: absolute;
+        top: 50%;
+        left: 10px;
+        width: 45%;
+        padding-right: 10px;
+        white-space: nowrap;
+        transform: translateY(-50%);
+        content: attr(data-label);
+        font-weight: bold;
+        color: #495057;
+    }
+
+    table tbody td:last-child {
+        text-align: left;
+    }
+
     .sidebar {
         width: 100%;
         height: auto;

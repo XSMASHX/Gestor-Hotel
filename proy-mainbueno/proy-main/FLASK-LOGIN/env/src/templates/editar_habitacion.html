@@ -8,12 +8,12 @@
 <form method="POST" action="{{ url_for('editar_habitacion', id=habitacion['id']) }}" onsubmit="combineDates(event)" class="editar-habitacion-form">
     <div class="form-group">
         <label for="fecha_entrada">Fecha de Entrada:</label>
-        <input type="date" id="fecha_entrada" name="fecha_entrada" value="{{ habitacion['tiempo_reservacion'].split(' a ')[0] }}" required>
+        <input type="date" id="fecha_entrada" name="fecha_entrada" value="{{ habitacion['tiempo_reservacion'].split(' a ')[0] if habitacion['tiempo_reservacion'] else '' }}" required>
     </div>
 
     <div class="form-group">
         <label for="fecha_salida">Fecha de Salida:</label>
-        <input type="date" id="fecha_salida" name="fecha_salida" value="{{ habitacion['tiempo_reservacion'].split(' a ')[1] }}" required>
+        <input type="date" id="fecha_salida" name="fecha_salida" value="{{ habitacion['tiempo_reservacion'].split(' a ')[1] if habitacion['tiempo_reservacion'] else '' }}" required>
     </div>
 
     <input type="hidden" id="tiempo_reservacion" name="tiempo_reservacion">
